@@ -391,16 +391,27 @@ def _cat_status_label(status):
 
 def send_email(subject, changes, shows, movie_info, status_message=""):
     api_key = RESEND_API_KEY.strip()
-    to = RESEND_TO_EMAIL.strip()
+    recipients = [
+        value.strip()
+        for value in re.split(r"[,;]", RESEND_TO_EMAIL)
+        if value.strip()
+    ]
     frm = RESEND_FROM_EMAIL.strip() or "onboarding@resend.dev"
     email_pattern = r"(?:[^<>\s]+@[^<>\s]+|[^<>]+<[^<>\s]+@[^<>\s]+>)"
     if not re.fullmatch(email_pattern, frm):
         print(f"  ⚠️  Invalid RESEND_FROM_EMAIL: {frm!r}. Using onboarding@resend.dev")
         frm = "onboarding@resend.dev"
 
-    if not api_key or not to:
+    if not api_key or not recipients:
         print("  ⚠️  Skipping email — RESEND_API_KEY or RESEND_TO_EMAIL not set.")
         return
+
+    invalid_recipients = [r for r in recipients if not re.fullmatch(email_pattern, r)]
+    if invalid_recipients:
+        print(f"  ⚠️  Invalid RESEND_TO_EMAIL recipient(s): {', '.join(invalid_recipients)}")
+        recipients = [r for r in recipients if r not in invalid_recipients]
+        if not recipients:
+            return
 
     now_str = datetime.now().strftime("%d %b %Y, %I:%M %p")
     movie_name = movie_info.get("name", "Movie")
@@ -522,14 +533,14 @@ def send_email(subject, changes, shows, movie_info, status_message=""):
                 "Content-Type": "application/json",
             },
             json={
-                "from": frm, "to": [to],
+                "from": frm, "to": recipients,
                 "subject": subject,
                 "text": plain, "html": html,
             },
             timeout=15,
         )
         if resp.status_code in (200, 201):
-            print(f"  ✅ Email sent to {to}")
+            print(f"  ✅ Email sent to {', '.join(recipients)}")
         else:
             print(f"  ❌ Resend {resp.status_code}: {resp.text}")
             sys.exit(1)

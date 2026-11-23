@@ -389,7 +389,7 @@ def _cat_status_label(status):
     return AVAIL_STATUS_MAP.get(status, ("UNKNOWN", ""))[0]
 
 
-def send_email(subject, changes, shows, movie_info):
+def send_email(subject, changes, shows, movie_info, status_message=""):
     api_key = RESEND_API_KEY.strip()
     to = RESEND_TO_EMAIL.strip()
     frm = RESEND_FROM_EMAIL.strip() or "onboarding@resend.dev"
@@ -400,6 +400,16 @@ def send_email(subject, changes, shows, movie_info):
 
     now_str = datetime.now().strftime("%d %b %Y, %I:%M %p")
     movie_name = movie_info.get("name", "Movie")
+
+    # Build monitoring status HTML
+    status_html = ""
+    if status_message:
+        status_html = f"""
+        <div style="margin:0 0 20px 0;padding:12px 14px;
+                    background:#eef6ff;border-left:4px solid #2563eb;
+                    color:#1e3a5f;font-size:14px;line-height:1.5;">
+            {escape(status_message)}
+        </div>"""
 
     # Build changes HTML
     changes_html = ""
@@ -467,6 +477,7 @@ def send_email(subject, changes, shows, movie_info):
         {escape(now_str)}
     </p>
     <hr style="border:none;border-top:1px solid #ddd;margin:0 0 20px 0;">
+    {status_html}
     {changes_html}
     <h3 style="margin:0 0 8px 0;font-size:15px;font-weight:bold;color:#333;">
         Current Showtimes
@@ -480,6 +491,8 @@ def send_email(subject, changes, shows, movie_info):
 
     # Build plain-text version with full show details
     plain_lines = [subject, "", f"Checked at: {now_str}", ""]
+    if status_message:
+        plain_lines.extend(["Monitoring Status:", f"  {status_message}", ""])
     if changes:
         plain_lines.append("Changes Detected:")
         plain_lines.extend(f"  - {c}" for c in changes)
@@ -521,6 +534,16 @@ def send_email(subject, changes, shows, movie_info):
         sys.exit(1)
 
 
+def send_test_mail(subject, changes, shows, movie_info, monitored_url, date_list):
+    """Send a monitoring status email containing the latest current state."""
+    date_text = ", ".join(date_list) if date_list else "auto-detected"
+    status_message = (
+        f"Monitoring is working. Checking {monitored_url}\n"
+        f"Dates: {date_text}"
+    )
+    send_email(subject, changes, shows, movie_info, status_message)
+
+
 # ──────────────────────────────────────────────────────────────────────
 # MAIN
 # ──────────────────────────────────────────────────────────────────────
@@ -536,6 +559,14 @@ def main():
 
     if not event_code or not region_slug:
         print("  ❌ Invalid BMS_URL. Could not extract event/region.")
+        send_test_mail(
+            "BMS Check: Invalid monitored URL",
+            [],
+            [],
+            {"name": "Configuration Error", "language": ""},
+            CONFIG["url"],
+            ["Not available"],
+        )
         sys.exit(1)
 
     region_code, region_slug_r, lat, lon, geohash = resolve_region(
@@ -574,6 +605,14 @@ def main():
 
     if not all_shows:
         print("  ❌ No showtimes found.")
+        send_test_mail(
+            "BMS Check Started: No showtimes found",
+            [],
+            [],
+            {"name": "No showtimes found", "language": ""},
+            CONFIG["url"],
+            date_list,
+        )
         sys.exit(0)
 
     print(f"  🎬 {movie_info['name']}  {movie_info['language']}")
@@ -601,12 +640,19 @@ def main():
         print(f"\n  ⚡ {len(changes)} change(s) detected:")
         for c in changes:
             print(f"     {c}")
-        send_email(
-            f"BMS Alert: {movie_info['name']} - {len(changes)} change(s)",
-            changes, filtered, movie_info,
-        )
     else:
         print("  ✅ No changes since last check.")
+
+    send_test_mail(
+        f"BMS Check: {movie_info['name']} - "
+        f"{len(changes)} change(s) detected" if changes
+        else f"BMS Check Started: {movie_info['name']} - No changes",
+        changes,
+        filtered,
+        movie_info,
+        CONFIG["url"],
+        date_list,
+    )
 
     # Print current status
     print(f"\n  Current status ({len(filtered)} shows):")

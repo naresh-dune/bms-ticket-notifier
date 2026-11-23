@@ -54,16 +54,19 @@ export BMS_THEATRE="PVR"
 export BMS_TIME="evening,night"
 export RESEND_API_KEY="re_..."
 export RESEND_TO_EMAIL="you@example.com"
-export RESEND_TO_EMAIL="python@resend.dev"
+export RESEND_FROM_EMAIL="python@resend.dev"
 
 uv run main.py
 ```
 
 ## Notifications
 
-You'll receive an email when:
+Every successful workflow run sends an email showing:
+- That the monitoring check started and the URL/dates being checked
+- The current status of all monitored shows, grouped by theatre
+- Any changes since the previous run
+
+The change types reported by the checker include:
 - A new showtime is added
 - A date opens for booking
 - Seat availability changes (e.g. sold out → available)
-
-Emails show a summary of what changed and the current status of all monitored shows, grouped by theatre.

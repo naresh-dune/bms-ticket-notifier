@@ -31,7 +31,7 @@ CONFIG = {
 
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 RESEND_TO_EMAIL = os.getenv("RESEND_TO_EMAIL", "")
-RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "aviiciii@resend.dev")
+RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev")
 
 STATE_FILE = "bms_state.json"
 
@@ -393,6 +393,10 @@ def send_email(subject, changes, shows, movie_info, status_message=""):
     api_key = RESEND_API_KEY.strip()
     to = RESEND_TO_EMAIL.strip()
     frm = RESEND_FROM_EMAIL.strip() or "onboarding@resend.dev"
+    email_pattern = r"(?:[^<>\s]+@[^<>\s]+|[^<>]+<[^<>\s]+@[^<>\s]+>)"
+    if not re.fullmatch(email_pattern, frm):
+        print(f"  ⚠️  Invalid RESEND_FROM_EMAIL: {frm!r}. Using onboarding@resend.dev")
+        frm = "onboarding@resend.dev"
 
     if not api_key or not to:
         print("  ⚠️  Skipping email — RESEND_API_KEY or RESEND_TO_EMAIL not set.")
